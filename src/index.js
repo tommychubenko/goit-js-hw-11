@@ -70,7 +70,9 @@ searchForm.addEventListener('submit', e => {
   e.preventDefault();
   gallery.innerHTML = '';
   searchTerm = e.target[0].value;
-  fetchImg(e.target[0].value).then(r => markuping(r.hits));
+  fetchImg(e.target[0].value)
+    .then(r => markuping(r.hits))
+    .then(showBtn());
 
   console.dir(fetchImg(e.target[0].value));
   page += 1;
