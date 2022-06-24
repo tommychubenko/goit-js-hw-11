@@ -1,13 +1,7 @@
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-
-const searchForm = document.querySelector('.search-form');
-const gallery = document.querySelector('.gallery');
-const loadMoreBtn = document.querySelector('.button-55');
-
-const PIXA_KEY = '28226957-200d43869ee80bd5ab4812e4f';
-let searchTerm = '';
-let page = 1;
+import axios from 'axios';
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
 let lightbox = new SimpleLightbox('.gallery a', {
   captionsData: 'alt',
@@ -15,30 +9,41 @@ let lightbox = new SimpleLightbox('.gallery a', {
   captionPosition: 'bottom',
 });
 
+const searchForm = document.querySelector('.search-form');
+const gallery = document.querySelector('.gallery');
+const loadMoreBtn = document.querySelector('.button-55');
+
+const PIXA_KEY = '28226957-200d43869ee80bd5ab4812e4f';
+const URL = `https://pixabay.com/api/?key=${PIXA_KEY}`;
+let searchTerm = '';
+let page = 1;
+let perPage = 40;
+``;
 function fetchImg(whatToSearch) {
-  return fetch(
-    `https://pixabay.com/api/?key=${PIXA_KEY}&q=${whatToSearch}&image_type=photo&safesearch=false&orientation=horizontal&per_page=40&page=${page}`
-  ).then(r => r.json());
+  return axios.get(
+    `${URL}&q=${whatToSearch}&image_type=photo&safesearch=false&orientation=horizontal&per_page=${perPage}&page=${page}`
+  );
 }
 
 function markuping(images) {
-  const markUp = images
-    .map(image => {
-      const {
-        previewURL,
-        likes,
-        views,
-        comments,
-        downloads,
-        largeImageURL,
-        id,
-      } = image;
+  const markUp = images.map(image => createGalleryItem(image)).join('');
+  gallery.insertAdjacentHTML('beforeend', markUp);
+  lightbox.refresh();
+}
 
-      return `<div class="photo-card">
-  <a class="gallery__item" href="${largeImageURL}">
+function createGalleryItem({
+  previewURL,
+  likes,
+  views,
+  comments,
+  downloads,
+  largeImageURL,
+  id,
+}) {
+  return `<a class="gallery__item" href="${largeImageURL}">
+    <div class="photo-card"> 
     <img class="gallery__image" src="${previewURL}" alt="${id}"/>
-  </a>
-  <div class="info">
+    <div class="info">
     <p class="info-item">
       <b>Likes:</b></br>${likes}
     </p>
@@ -55,33 +60,56 @@ function markuping(images) {
       ${downloads}
     </p>
   </div>
-</div>`;
-    })
-    .join('');
-  gallery.insertAdjacentHTML('beforeend', markUp);
+</div>
+</a>`;
 }
 
-function showBtn() {
-  loadMoreBtn.classList.remove('is-hidden');
+function showBtn(hide) {
+  if (hide) {
+    loadMoreBtn.classList.remove('is-hidden');
+  } else {
+    loadMoreBtn.classList.add('is-hidden');
+  }
 }
 
-searchForm.addEventListener('submit', e => {
+function showNotify(q) {
+  console.log(q);
+  if (q) {
+    Notify.success(`"Hooray! We found ${q} images."`);
+  } else {
+    Notify.failure(
+      "We're sorry, but you've reached the end of search results."
+    );
+  }
+}
+
+function scrollBy() {
+  const { height: cardHeight } = document
+    .querySelector('.gallery')
+    .firstElementChild.getBoundingClientRect();
+
+  window.scrollBy({
+    top: cardHeight * 2,
+    behavior: 'smooth',
+  });
+}
+
+searchForm.addEventListener('submit', async e => {
   page = 1;
   e.preventDefault();
   gallery.innerHTML = '';
   searchTerm = e.target[0].value;
-  fetchImg(e.target[0].value)
-    .then(r => markuping(r.hits))
-    .then(showBtn());
-
-  console.dir(fetchImg(e.target[0].value));
+  const r = await fetchImg(searchTerm);
+  markuping(r?.data?.hits);
+  if (r?.data?.totalHits) scrollBy();
+  showNotify(r?.data?.totalHits);
   page += 1;
-  //   console.log(page);
-  e.target[0].value = '';
+  showBtn(r?.data?.hits?.length >= perPage && r?.data?.totalHits);
 });
 
-loadMoreBtn.addEventListener('click', e => {
-  fetchImg(searchTerm).then(r => markuping(r.hits));
+loadMoreBtn.addEventListener('click', async e => {
+  const r = await fetchImg(searchTerm);
+  markuping(r?.data?.hits);
+  scrollBy();
   page += 1;
-  //   console.log(page);
 });
